@@ -7,16 +7,40 @@ from pyinjective.core.network import Network
 from queries import get_market_contract_executes, get_all_borrow_accounts, get_NEPT_emission_rate, get_borrow_rates, get_lending_rates, get_NEPT_staking_amounts, get_NEPT_circulating_supply, get_nToken_circulating_supply, get_lent_amount, get_borrowed_amount, get_token_prices, get_nToken_contract_executes, get_NEPT_staking_rates
 from models import MarketData, PriceData, ContractData, NEPTData, SessionLocal
 from sqlalchemy import desc
+import threading
+import os
 
 app = Flask(__name__)
 
-# Configure logging
+# Configure logging to output to stdout
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
+    datefmt='%Y-%m-%d %H:%M:%S',
+    handlers=[logging.StreamHandler()]
 )
 logger = logging.getLogger('neptune-data')
+
+# Global event loop for background tasks
+background_loop = None
+background_thread = None
+
+def run_background_loop():
+    global background_loop
+    background_loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(background_loop)
+    background_loop.run_forever()
+
+def start_background_tasks():
+    global background_thread
+    logger.info("Starting background tasks thread")
+    background_thread = threading.Thread(target=run_background_loop)
+    background_thread.daemon = True
+    background_thread.start()
+    
+    # Schedule the periodic task
+    asyncio.run_coroutine_threadsafe(run_periodically(), background_loop)
+    logger.info("Background tasks started successfully")
 
 async def fetch_data():
     network: Network = Network.mainnet()
@@ -29,18 +53,18 @@ async def fetch_data():
     try:
         # Fetch market data
         borrow_accounts_data = await get_all_borrow_accounts(client)
-        logger.info(f"Successfully fetched borrow accounts data")
+        logger.info(f"Successfully fetched borrow accounts data: {borrow_accounts_data}")
         
         lent_amount = await get_lent_amount(client)
         borrowed_amount = await get_borrowed_amount(client)
-        logger.info(f"Successfully fetched lending/borrowing amounts")
+        logger.info(f"Successfully fetched lending/borrowing amounts: {lent_amount}, {borrowed_amount}")
         
         borrow_rates = await get_borrow_rates(client)
         lending_rates = await get_lending_rates(client)
         logger.info(f"Successfully fetched interest rates")
         
         nToken_circulating_supply = await get_nToken_circulating_supply()
-        logger.info(f"Successfully fetched nToken supply")
+        logger.info(f"Successfully fetched nToken supply: {nToken_circulating_supply}")
         
         # Store market data
         market_data = MarketData(
@@ -53,13 +77,14 @@ async def fetch_data():
             ntoken_circulating_supply=nToken_circulating_supply
         )
         db.add(market_data)
+        logger.info("Added market data to database")
 
         # Fetch and store price data
         logger.info("Fetching price data...")
         token_prices = await get_token_prices(client)
         price_data = PriceData(token_prices=token_prices)
         db.add(price_data)
-        logger.info("Successfully fetched and stored token prices")
+        logger.info(f"Successfully fetched and stored token prices: {token_prices}")
 
         # Fetch and store contract data
         logger.info("Fetching contract data...")
@@ -87,7 +112,7 @@ async def fetch_data():
             staking_rates=NEPT_staking_rates
         )
         db.add(nept_data)
-        logger.info("Successfully fetched and stored NEPT data")
+        logger.info(f"Successfully fetched and stored NEPT data: supply={NEPT_circulating_supply}, bonded={NEPT_total_bonded}")
         
         # Commit all changes
         db.commit()
@@ -101,6 +126,7 @@ async def fetch_data():
         db.close()
 
 async def run_periodically():
+    logger.info("Starting periodic data fetch")
     while True:
         try:
             await fetch_data()
@@ -108,7 +134,7 @@ async def run_periodically():
             logger.error(f"Error in periodic data fetch: {str(e)}", exc_info=True)
         
         logger.info("Waiting 24 hours until next data fetch")
-        await asyncio.sleep(60)  # 24 hours in seconds
+        await asyncio.sleep(24 * 60 * 60)  # 24 hours in seconds
 
 @app.route('/')
 def index():
@@ -122,6 +148,7 @@ def index():
             'contract_data': db.query(ContractData).order_by(desc(ContractData.timestamp)).first(),
             'nept_data': db.query(NEPTData).order_by(desc(NEPTData.timestamp)).first()
         }
+        logger.info(f"Returning latest data: {latest_data}")
         return jsonify({
             k: v.__dict__ if v else None 
             for k, v in latest_data.items()
@@ -154,6 +181,7 @@ def historical_data(data_type, days):
             model.timestamp <= end_date
         ).order_by(model.timestamp).all()
         
+        logger.info(f"Returning {len(data)} historical records")
         return jsonify([item.__dict__ for item in data])
     finally:
         db.close()
@@ -164,24 +192,19 @@ def health():
     db = SessionLocal()
     try:
         latest_market_data = db.query(MarketData).order_by(desc(MarketData.timestamp)).first()
-        return jsonify({
+        status = {
             'status': 'healthy',
             'last_update': latest_market_data.timestamp.isoformat() if latest_market_data else None,
-            'data_available': bool(latest_market_data)
-        })
+            'data_available': bool(latest_market_data),
+            'background_thread_running': bool(background_thread and background_thread.is_alive())
+        }
+        logger.info(f"Health check status: {status}")
+        return jsonify(status)
     finally:
         db.close()
 
-def start_background_tasks():
-    logger.info("Starting background tasks")
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.create_task(run_periodically())
+# Start background tasks when the application starts
+start_background_tasks()
 
 if __name__ == "__main__":
-    # Start background tasks
-    start_background_tasks()
-    
-    # Run Flask app
-    logger.info("Starting Flask application")
     app.run(host='0.0.0.0', port=8080)
