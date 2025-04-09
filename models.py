@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import create_engine, Column, Integer, Float, String, DateTime, ForeignKey, DECIMAL
+from sqlalchemy import create_engine, Column, Integer, Float, String, DateTime, ForeignKey, DECIMAL, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 import os
@@ -22,7 +22,7 @@ def get_db():
 class MarketData(Base):
     __tablename__ = "market_data"
     
-    timestamp = Column(DateTime, primary_key=True, default=datetime.utcnow)
+    timestamp = Column(DateTime, primary_key=True, default=datetime.utcnow, unique=True)
     borrow_accounts_count = Column(Integer)
     unique_borrow_addresses = Column(Integer)
     
@@ -55,14 +55,14 @@ class TokenAmounts(Base):
 class TokenPrices(Base):
     __tablename__ = "token_prices"
     
-    timestamp = Column(DateTime, primary_key=True)
+    timestamp = Column(DateTime, primary_key=True, unique=True)
     token_symbol = Column(String(10), primary_key=True)
     price = Column(DECIMAL(20,8))
 
 class ContractData(Base):
     __tablename__ = "contract_data"
     
-    timestamp = Column(DateTime, primary_key=True, default=datetime.utcnow)
+    timestamp = Column(DateTime, primary_key=True, default=datetime.utcnow, unique=True)
     
     # Relationships
     ntoken_executes = relationship("NTokenContractExecutes", back_populates="contract_data")
@@ -91,7 +91,7 @@ class MarketContractExecutes(Base):
 class NEPTData(Base):
     __tablename__ = "nept_data"
     
-    timestamp = Column(DateTime, primary_key=True, default=datetime.utcnow)
+    timestamp = Column(DateTime, primary_key=True, default=datetime.utcnow, unique=True)
     circulating_supply = Column(DECIMAL(20,8))
     emission_rate = Column(DECIMAL(10,4))
     total_bonded = Column(DECIMAL(20,8))
