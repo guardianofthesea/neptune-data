@@ -9,6 +9,7 @@ from models import MarketData, PriceData, ContractData, NEPTData, SessionLocal
 from sqlalchemy import desc
 import threading
 import os
+import time
 
 app = Flask(__name__)
 
@@ -24,23 +25,37 @@ logger = logging.getLogger('neptune-data')
 # Global event loop for background tasks
 background_loop = None
 background_thread = None
+background_task = None
 
 def run_background_loop():
-    global background_loop
-    background_loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(background_loop)
-    background_loop.run_forever()
+    global background_loop, background_task
+    try:
+        background_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(background_loop)
+        background_task = background_loop.create_task(run_periodically())
+        background_loop.run_forever()
+    except Exception as e:
+        logger.error(f"Error in background loop: {str(e)}", exc_info=True)
+        raise
 
 def start_background_tasks():
     global background_thread
-    logger.info("Starting background tasks thread")
-    background_thread = threading.Thread(target=run_background_loop)
-    background_thread.daemon = True
-    background_thread.start()
-    
-    # Schedule the periodic task
-    asyncio.run_coroutine_threadsafe(run_periodically(), background_loop)
-    logger.info("Background tasks started successfully")
+    try:
+        logger.info("Starting background tasks thread")
+        background_thread = threading.Thread(target=run_background_loop)
+        background_thread.daemon = True
+        background_thread.start()
+        
+        # Wait a moment to ensure the loop is running
+        time.sleep(1)
+        
+        if background_loop is None or not background_loop.is_running():
+            raise RuntimeError("Background loop failed to start")
+            
+        logger.info("Background tasks started successfully")
+    except Exception as e:
+        logger.error(f"Failed to start background tasks: {str(e)}", exc_info=True)
+        raise
 
 async def fetch_data():
     network: Network = Network.mainnet()
@@ -196,7 +211,9 @@ def health():
             'status': 'healthy',
             'last_update': latest_market_data.timestamp.isoformat() if latest_market_data else None,
             'data_available': bool(latest_market_data),
-            'background_thread_running': bool(background_thread and background_thread.is_alive())
+            'background_thread_running': bool(background_thread and background_thread.is_alive()),
+            'background_loop_running': bool(background_loop and background_loop.is_running()),
+            'background_task_running': bool(background_task and not background_task.done())
         }
         logger.info(f"Health check status: {status}")
         return jsonify(status)
