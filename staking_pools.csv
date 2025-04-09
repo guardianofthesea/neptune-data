@@ -1,0 +1,4 @@
+staking_pool,period_nano,period_days
+staking_pool_1,604800000000000,7
+staking_pool_2,2592000000000000,30
+staking_pool_3,7776000000000000,90
