@@ -149,7 +149,7 @@ async def run_periodically():
             logger.error(f"Error in periodic data fetch: {str(e)}", exc_info=True)
         
         logger.info("Waiting 24 hours until next data fetch")
-        await asyncio.sleep(24 * 60 * 60)  # 24 hours in seconds
+        await asyncio.sleep(60)  # 24 hours in seconds
 
 @app.route('/')
 def index():
