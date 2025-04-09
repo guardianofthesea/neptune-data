@@ -8,6 +8,8 @@ from pyinjective.core.network import Network
 from queries import get_market_contract_executes, get_all_borrow_accounts, get_NEPT_emission_rate, get_borrow_rates, get_lending_rates, get_NEPT_staking_amounts, get_NEPT_circulating_supply, get_nToken_circulating_supply, get_lent_amount, get_borrowed_amount, get_token_prices, get_nToken_contract_executes, get_NEPT_staking_rates
 
 async def main() -> None:
+    app.run(host='0.0.0.0', port=8080)
+
     network: Network = Network.mainnet()
     client: AsyncClient = AsyncClient(network)
     
