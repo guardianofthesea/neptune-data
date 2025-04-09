@@ -26,11 +26,11 @@ class MarketData(Base):
     timestamp = Column(DateTime, default=datetime.utcnow)
     borrow_accounts_count = Column(Integer)
     unique_borrow_addresses = Column(Integer)
-    lent_amount = Column(Float)
-    borrowed_amount = Column(Float)
+    lent_amount = Column(JSON)
+    borrowed_amount = Column(JSON)
     borrow_rates = Column(JSON)
     lending_rates = Column(JSON)
-    ntoken_circulating_supply = Column(Float)
+    ntoken_circulating_supply = Column(JSON)
 
 class PriceData(Base):
     __tablename__ = "price_data"
