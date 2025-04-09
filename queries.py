@@ -183,7 +183,7 @@ async def get_lent_amount(client):
     contract_state = await client.fetch_smart_contract_state(address=address, query_data=query_data)
     decoded_data = base64.b64decode(contract_state["data"]).decode("utf-8")
     lent_amounts = json.loads(decoded_data)
-    print(json.dumps(lent_amounts, indent=2))
+    #print(json.dumps(lent_amounts, indent=2))
 
     lent_amounts_dict = {}
 
@@ -212,7 +212,7 @@ async def get_borrowed_amount(client):
     contract_state = await client.fetch_smart_contract_state(address=address, query_data=query_data)
     decoded_data = base64.b64decode(contract_state["data"]).decode("utf-8")
     borrowed_amounts = json.loads(decoded_data)
-    print(json.dumps(borrowed_amounts, indent=2))
+    #print(json.dumps(borrowed_amounts, indent=2))
 
     borrowed_amounts_dict = {}
 

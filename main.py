@@ -10,6 +10,8 @@ from sqlalchemy import desc
 import threading
 import os
 import time
+from collect_data import collect_and_store_data
+import schedule
 
 app = Flask(__name__)
 
@@ -220,8 +222,32 @@ def health():
     finally:
         db.close()
 
+async def run_collection():
+    print(f"Starting data collection at {datetime.utcnow()}")
+    await collect_and_store_data()
+
+def job():
+    asyncio.run(run_collection())
+
+def start_background_tasks():
+    # Run immediately on startup
+    job()
+    
+    # Schedule to run every 5 minutes
+    schedule.every(5).minutes.do(job)
+
+@app.route('/')
+def home():
+    return "Neptune Data Collector is running"
+
 # Start background tasks when the application starts
 start_background_tasks()
 
 if __name__ == "__main__":
+    # Start the Flask app
     app.run(host='0.0.0.0', port=8080)
+    
+    # Keep the scheduler running
+    while True:
+        schedule.run_pending()
+        time.sleep(1)

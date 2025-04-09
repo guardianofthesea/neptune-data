@@ -1,7 +1,7 @@
 from datetime import datetime
-from sqlalchemy import create_engine, Column, Integer, Float, String, DateTime, JSON
+from sqlalchemy import create_engine, Column, Integer, Float, String, DateTime, ForeignKey, DECIMAL
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, relationship
 import os
 
 # Get database URL from environment variable
@@ -22,41 +22,93 @@ def get_db():
 class MarketData(Base):
     __tablename__ = "market_data"
     
-    id = Column(Integer, primary_key=True, index=True)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, primary_key=True, default=datetime.utcnow)
     borrow_accounts_count = Column(Integer)
     unique_borrow_addresses = Column(Integer)
-    lent_amount = Column(JSON)
-    borrowed_amount = Column(JSON)
-    borrow_rates = Column(JSON)
-    lending_rates = Column(JSON)
-    ntoken_circulating_supply = Column(JSON)
-
-class PriceData(Base):
-    __tablename__ = "price_data"
     
-    id = Column(Integer, primary_key=True, index=True)
-    timestamp = Column(DateTime, default=datetime.utcnow)
-    token_prices = Column(JSON)
+    # Relationships
+    token_rates = relationship("TokenRates", back_populates="market_data")
+    token_amounts = relationship("TokenAmounts", back_populates="market_data")
+
+class TokenRates(Base):
+    __tablename__ = "token_rates"
+    
+    timestamp = Column(DateTime, ForeignKey('market_data.timestamp'), primary_key=True)
+    token_symbol = Column(String(10), primary_key=True)
+    borrow_rate = Column(DECIMAL(10,4))
+    lend_rate = Column(DECIMAL(10,4))
+    
+    # Relationship
+    market_data = relationship("MarketData", back_populates="token_rates")
+
+class TokenAmounts(Base):
+    __tablename__ = "token_amounts"
+    
+    timestamp = Column(DateTime, ForeignKey('market_data.timestamp'), primary_key=True)
+    token_symbol = Column(String(10), primary_key=True)
+    borrowed_amount = Column(DECIMAL(20,8))
+    lent_amount = Column(DECIMAL(20,8))
+    
+    # Relationship
+    market_data = relationship("MarketData", back_populates="token_amounts")
+
+class TokenPrices(Base):
+    __tablename__ = "token_prices"
+    
+    timestamp = Column(DateTime, primary_key=True)
+    token_symbol = Column(String(10), primary_key=True)
+    price = Column(DECIMAL(20,8))
 
 class ContractData(Base):
     __tablename__ = "contract_data"
     
-    id = Column(Integer, primary_key=True, index=True)
-    timestamp = Column(DateTime, default=datetime.utcnow)
-    ntoken_contract_executes = Column(JSON)
-    market_contract_executes = Column(JSON)
+    timestamp = Column(DateTime, primary_key=True, default=datetime.utcnow)
+    
+    # Relationships
+    ntoken_executes = relationship("NTokenContractExecutes", back_populates="contract_data")
+    market_executes = relationship("MarketContractExecutes", back_populates="contract_data")
+
+class NTokenContractExecutes(Base):
+    __tablename__ = "ntoken_contract_executes"
+    
+    timestamp = Column(DateTime, ForeignKey('contract_data.timestamp'), primary_key=True)
+    token_symbol = Column(String(10), primary_key=True)
+    execute_count = Column(Integer)
+    
+    # Relationship
+    contract_data = relationship("ContractData", back_populates="ntoken_executes")
+
+class MarketContractExecutes(Base):
+    __tablename__ = "market_contract_executes"
+    
+    timestamp = Column(DateTime, ForeignKey('contract_data.timestamp'), primary_key=True)
+    contract_type = Column(String(50), primary_key=True)
+    execute_count = Column(Integer)
+    
+    # Relationship
+    contract_data = relationship("ContractData", back_populates="market_executes")
 
 class NEPTData(Base):
     __tablename__ = "nept_data"
     
-    id = Column(Integer, primary_key=True, index=True)
-    timestamp = Column(DateTime, default=datetime.utcnow)
-    circulating_supply = Column(Float)
-    emission_rate = Column(Float)
-    staking_amounts = Column(JSON)
-    total_bonded = Column(Float)
-    staking_rates = Column(JSON)
+    timestamp = Column(DateTime, primary_key=True, default=datetime.utcnow)
+    circulating_supply = Column(DECIMAL(20,8))
+    emission_rate = Column(DECIMAL(10,4))
+    total_bonded = Column(DECIMAL(20,8))
+    
+    # Relationship
+    staking_pools = relationship("StakingPools", back_populates="nept_data")
+
+class StakingPools(Base):
+    __tablename__ = "staking_pools"
+    
+    timestamp = Column(DateTime, ForeignKey('nept_data.timestamp'), primary_key=True)
+    pool_number = Column(Integer, primary_key=True)
+    staking_amount = Column(DECIMAL(20,8))
+    staking_rate = Column(DECIMAL(10,4))
+    
+    # Relationship
+    nept_data = relationship("NEPTData", back_populates="staking_pools")
 
 # Create all tables
 Base.metadata.create_all(bind=engine) 
