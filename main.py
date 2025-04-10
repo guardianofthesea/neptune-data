@@ -5,7 +5,7 @@ from flask import Flask, jsonify
 from pyinjective.async_client import AsyncClient
 from pyinjective.core.network import Network
 from queries import get_market_contract_executes, get_all_borrow_accounts, get_NEPT_emission_rate, get_borrow_rates, get_lending_rates, get_NEPT_staking_amounts, get_NEPT_circulating_supply, get_nToken_circulating_supply, get_lent_amount, get_borrowed_amount, get_token_prices, get_nToken_contract_executes, get_NEPT_staking_rates
-from models import MarketData, PriceData, ContractData, NEPTData, SessionLocal
+from models import MarketData, TokenPrices, ContractData, NEPTData, SessionLocal
 from sqlalchemy import desc
 import threading
 import os
@@ -100,7 +100,7 @@ async def fetch_data():
         # Fetch and store price data
         logger.info("Fetching price data...")
         token_prices = await get_token_prices(client)
-        price_data = PriceData(token_prices=token_prices)
+        price_data = TokenPrices(token_prices=token_prices)
         db.add(price_data)
         logger.info(f"Successfully fetched and stored token prices: {token_prices}")
 
@@ -162,7 +162,7 @@ def index():
     try:
         latest_data = {
             'market_data': db.query(MarketData).order_by(desc(MarketData.timestamp)).first(),
-            'price_data': db.query(PriceData).order_by(desc(PriceData.timestamp)).first(),
+            'price_data': db.query(TokenPrices).order_by(desc(TokenPrices.timestamp)).first(),
             'contract_data': db.query(ContractData).order_by(desc(ContractData.timestamp)).first(),
             'nept_data': db.query(NEPTData).order_by(desc(NEPTData.timestamp)).first()
         }
@@ -185,7 +185,7 @@ def historical_data(data_type, days):
         
         model_map = {
             'market': MarketData,
-            'price': PriceData,
+            'price': TokenPrices,
             'contract': ContractData,
             'nept': NEPTData
         }
