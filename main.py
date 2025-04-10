@@ -20,7 +20,8 @@ app = Flask(__name__)
 logging.basicConfig(
     level=logging.INFO,
     format='[%(asctime)s] %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
+    datefmt='%Y-%m-%d %H:%M:%S',
+    handlers=[logging.StreamHandler()]
 )
 logger = logging.getLogger('neptune-data')
 
@@ -36,7 +37,7 @@ def start_background_tasks():
         job()
         
         # Schedule to run every 2 minutes
-        schedule.every(2).minutes.do(job)
+        schedule.every(1).minutes.do(job)
         
         # Start scheduler in a separate thread
         collection_thread = threading.Thread(target=run_scheduler)

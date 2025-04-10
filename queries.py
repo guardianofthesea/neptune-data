@@ -11,6 +11,15 @@ import decimal
 import aiohttp
 import csv
 import os
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger('neptune-data')
 
 # Cache for CSV data to avoid repeated file access
 _tokens_cache = None
@@ -26,7 +35,7 @@ def _load_tokens():
                 tokens = csv.DictReader(f)
                 _tokens_cache = list(tokens)
         except Exception as e:
-            print(f"Error loading tokens: {e}")
+            logger.error(f"Error loading tokens: {e}")
             _tokens_cache = []
     return _tokens_cache
 
@@ -40,7 +49,7 @@ def _load_staking_pools():
                 staking_pools = csv.DictReader(f)
                 _staking_pools_cache = list(staking_pools)
         except Exception as e:
-            print(f"Error loading staking pools: {e}")
+            logger.error(f"Error loading staking pools: {e}")
             _staking_pools_cache = []
     return _staking_pools_cache
 
@@ -53,7 +62,7 @@ def _get_token_info(denom):
     return None
 
 async def get_market_contract_executes(client):
-    print("Getting market contract executes")
+    logger.info("Getting market contract executes")
 
     wasm_contract = await client.fetch_wasm_contract_by_address(address="inj1nc7gjkf2mhp34a6gquhurg8qahnw5kxs5u3s4u")
 
@@ -64,7 +73,7 @@ async def get_market_contract_executes(client):
 
 
 async def get_all_borrow_accounts(client):
-    print("Getting all borrow accounts")
+    logger.info("Getting all borrow accounts")
     address = "inj1nc7gjkf2mhp34a6gquhurg8qahnw5kxs5u3s4u"
     limit = 100  # Number of accounts to fetch per request
     
@@ -126,7 +135,7 @@ async def get_all_borrow_accounts(client):
 
 
 async def get_borrow_rates(client):
-    print("Getting rates")
+    logger.info("Getting rates")
     address = "inj1ftech0pdjrjawltgejlmpx57cyhsz6frdx2dhq"
     query_data = '{"get_all_borrow_rates": {}}'
     contract_state = await client.fetch_smart_contract_state(address=address, query_data=query_data)
@@ -145,7 +154,7 @@ async def get_borrow_rates(client):
     return rates_dict
 
 async def get_lending_rates(client):
-    print("Getting rates")
+    logger.info("Getting rates")
     address = "inj1ftech0pdjrjawltgejlmpx57cyhsz6frdx2dhq"
     query_data = '{"get_all_lending_rates": {}}'
     contract_state = await client.fetch_smart_contract_state(address=address, query_data=query_data)
@@ -164,7 +173,7 @@ async def get_lending_rates(client):
     return rates_dict
 
 async def get_NEPT_staking_amounts(client):
-    print("Getting staking yields")
+    logger.info("Getting staking yields")
     address = "inj1v3a4zznudwpukpr8y987pu5gnh4xuf7v36jhva"
     query_data = '{"get_state": {}}'
     contract_state = await client.fetch_smart_contract_state(address=address, query_data=query_data)
@@ -192,7 +201,7 @@ async def get_NEPT_circulating_supply(client=None):
     Get NEPT circulating supply from the API.
     Client parameter is optional to maintain compatibility with other function calls.
     """
-    print("Getting nept circulating supply")
+    logger.info("Getting nept circulating supply")
     url = "https://api.nept.finance/v1/nept/circulating_supply"
     
     async with aiohttp.ClientSession() as session:
@@ -203,7 +212,7 @@ async def get_NEPT_circulating_supply(client=None):
     try:
         return float(nept_circulating_supply)
     except ValueError:
-        print(f"Warning: Could not convert circulating supply to float: {nept_circulating_supply}")
+        logger.warning(f"Warning: Could not convert circulating supply to float: {nept_circulating_supply}")
         return 0
 
 async def get_nToken_circulating_supply(client=None):
@@ -211,7 +220,7 @@ async def get_nToken_circulating_supply(client=None):
     Get nToken circulating supply values.
     Client parameter is optional to maintain compatibility with other function calls.
     """
-    print("Getting nTokens circulating supply")
+    logger.info("Getting nTokens circulating supply")
     nTokens = ["natom","nusdt","nusdc","ninj","nweth","nausd","nsol","ntia"]
     url = "https://api.nept.finance/v1/supply/"
     nToken_circulating_supply = {}
@@ -224,14 +233,14 @@ async def get_nToken_circulating_supply(client=None):
                 try:
                     nToken_circulating_supply[nToken] = float(supply_text)
                 except ValueError:
-                    print(f"Warning: Could not convert {nToken} supply to float: {supply_text}")
+                    logger.warning(f"Warning: Could not convert {nToken} supply to float: {supply_text}")
                     nToken_circulating_supply[nToken] = 0
-                print(f"nToken: {nToken}, Circulating Supply: {nToken_circulating_supply[nToken]}")
+                logger.info(f"nToken: {nToken}, Circulating Supply: {nToken_circulating_supply[nToken]}")
     
     return nToken_circulating_supply
 
 async def get_lent_amount(client):
-    print("Getting lent amount")
+    logger.info("Getting lent amount")
     address = "inj1nc7gjkf2mhp34a6gquhurg8qahnw5kxs5u3s4u"
     query_data = '{"get_all_markets": {}}'
     contract_state = await client.fetch_smart_contract_state(address=address, query_data=query_data)
@@ -255,7 +264,7 @@ async def get_lent_amount(client):
 
 
 async def get_borrowed_amount(client):
-    print("Getting borrowed amount")
+    logger.info("Getting borrowed amount")
     address = "inj1nc7gjkf2mhp34a6gquhurg8qahnw5kxs5u3s4u"
     query_data = '{"get_all_markets": {}}'
     contract_state = await client.fetch_smart_contract_state(address=address, query_data=query_data)
@@ -278,7 +287,7 @@ async def get_borrowed_amount(client):
     return borrowed_amounts_dict
 
 async def get_token_prices(client):
-    print("Getting token prices")
+    logger.info("Getting token prices")
     address = "inj1u6cclz0qh5tep9m2qayry9k97dm46pnlqf8nre"
 
     token_prices_dict = {}
@@ -300,7 +309,7 @@ async def get_token_prices(client):
     return token_prices_dict
 
 async def get_nToken_contract_executes(client):
-    print("Getting nToken contract executes")
+    logger.info("Getting nToken contract executes")
     nToken_contract_executes = {}
     tokens = _load_tokens()
     for token in tokens:
@@ -317,7 +326,7 @@ async def get_nToken_contract_executes(client):
     return nToken_contract_executes
 
 async def get_NEPT_staking_rates(client):
-    print("Getting NEPT staking rates")
+    logger.info("Getting NEPT staking rates")
     address = "inj1v3a4zznudwpukpr8y987pu5gnh4xuf7v36jhva"
     query_data = '{"get_params": {}}'
     contract_state = await client.fetch_smart_contract_state(address=address, query_data=query_data)
@@ -341,7 +350,7 @@ async def get_NEPT_staking_rates(client):
     pool_3_stake = float(staking_data["bonded"][2][1])/10**6
 
     average_yield = emission_rate / sum([pool_1_stake, pool_2_stake, pool_3_stake]) *100
-    print(f"Average yield: {average_yield}")
+    logger.info(f"Average yield: {average_yield}")
 
     # Calculate effective stakes
     eff_stake_1 = pool_1_stake * pool_1_reward_weight
@@ -373,7 +382,7 @@ async def get_NEPT_staking_rates(client):
     return pool_yield_dict
 
 async def get_NEPT_emission_rate(client):
-    print("Getting NEPT emission rate")
+    logger.info("Getting NEPT emission rate")
     address = "inj1v3a4zznudwpukpr8y987pu5gnh4xuf7v36jhva"
     query_data = '{"get_params": {}}'
     contract_state = await client.fetch_smart_contract_state(address=address, query_data=query_data)
@@ -388,7 +397,7 @@ async def main() -> None:
     client = AsyncClient(network)
     
     data = await get_NEPT_emission_rate(client)
-    print(data)
+    logger.info(data)
 
 
 if __name__ == "__main__":
