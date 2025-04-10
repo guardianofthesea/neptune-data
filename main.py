@@ -12,6 +12,7 @@ import os
 import time
 from collect_data import collect_and_store_data
 import schedule
+from database import get_db
 
 app = Flask(__name__)
 

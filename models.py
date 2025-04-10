@@ -108,7 +108,4 @@ class StakingPools(Base):
     staking_rate = Column(DECIMAL(10,4))
     
     # Relationship
-    nept_data = relationship("NEPTData", back_populates="staking_pools")
-
-# Create all tables
-Base.metadata.create_all(bind=engine) 
+    nept_data = relationship("NEPTData", back_populates="staking_pools") 
