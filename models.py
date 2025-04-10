@@ -1,16 +1,9 @@
 from datetime import datetime
-from sqlalchemy import create_engine, Column, Integer, Float, String, DateTime, ForeignKey, DECIMAL, UniqueConstraint
+from sqlalchemy import Column, Integer, Float, String, DateTime, ForeignKey, DECIMAL, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import relationship
 import os
-
-# Get database URL from environment variable
-DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/neptune_data')
-
-# Create SQLAlchemy engine
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+from database import Base, SessionLocal
 
 def get_db():
     db = SessionLocal()

@@ -10,6 +10,47 @@ from pyinjective.core.network import Network
 import decimal
 import aiohttp
 import csv
+import os
+
+# Cache for CSV data to avoid repeated file access
+_tokens_cache = None
+_staking_pools_cache = None
+
+def _load_tokens():
+    """Load tokens from CSV file and cache them"""
+    global _tokens_cache
+    if _tokens_cache is None:
+        _tokens_cache = []
+        try:
+            with open('tokens.csv') as f:
+                tokens = csv.DictReader(f)
+                _tokens_cache = list(tokens)
+        except Exception as e:
+            print(f"Error loading tokens: {e}")
+            _tokens_cache = []
+    return _tokens_cache
+
+def _load_staking_pools():
+    """Load staking pools from CSV file and cache them"""
+    global _staking_pools_cache
+    if _staking_pools_cache is None:
+        _staking_pools_cache = []
+        try:
+            with open('staking_pools.csv') as f:
+                staking_pools = csv.DictReader(f)
+                _staking_pools_cache = list(staking_pools)
+        except Exception as e:
+            print(f"Error loading staking pools: {e}")
+            _staking_pools_cache = []
+    return _staking_pools_cache
+
+def _get_token_info(denom):
+    """Get token information from the cached token data"""
+    tokens = _load_tokens()
+    for token in tokens:
+        if token['denom'] == denom:
+            return token
+    return None
 
 async def get_market_contract_executes(client):
     print("Getting market contract executes")
@@ -96,13 +137,10 @@ async def get_borrow_rates(client):
     for rate in rates_data:
         denom = rate[0]["native_token"]["denom"]
         rate_value = round(float(rate[1])*100,2)
-        with open('tokens.csv') as f:
-            tokens = csv.DictReader(f)
-            for token in tokens:
-                if token['denom'] == denom:
-                    ticker = token['ticker']
-                    break
-        rates_dict[ticker] = str(rate_value)+"%"
+        token_info = _get_token_info(denom)
+        if token_info:
+            ticker = token_info['ticker']
+            rates_dict[ticker] = str(rate_value)+"%"
     
     return rates_dict
 
@@ -118,13 +156,10 @@ async def get_lending_rates(client):
     for rate in rates_data:
         denom = rate[0]["native_token"]["denom"]
         rate_value = round(float(rate[1])*100,2)
-        with open('tokens.csv') as f:
-            tokens = csv.DictReader(f)
-            for token in tokens:
-                if token['denom'] == denom:
-                    ticker = token['ticker']
-                    break
-        rates_dict[ticker] = str(rate_value)+"%"
+        token_info = _get_token_info(denom)
+        if token_info:
+            ticker = token_info['ticker']
+            rates_dict[ticker] = str(rate_value)+"%"
     
     return rates_dict
 
@@ -138,22 +173,25 @@ async def get_NEPT_staking_amounts(client):
 
     bonded_dict = {}
     # Access the bonded list directly from staking_data
+    staking_pools = _load_staking_pools()
     for bond_entry in staking_data["bonded"]:
-        with open('staking_pools.csv') as f:
-            pool_duration = bond_entry[0]
-            amount = float(bond_entry[1])/10**6
-            staking_pools = csv.DictReader(f)
-            for staking_pool in staking_pools:
-                if str(pool_duration) == staking_pool['period_nano']:  # Convert pool_duration to string for comparison
-                    pool = staking_pool['staking_pool']
-                    bonded_dict[pool] = amount
-                    break
+        pool_duration = bond_entry[0]
+        amount = float(bond_entry[1])/10**6
+        for staking_pool in staking_pools:
+            if str(pool_duration) == staking_pool['period_nano']:  # Convert pool_duration to string for comparison
+                pool = staking_pool['staking_pool']
+                bonded_dict[pool] = amount
+                break
 
     total_bonded = sum(bonded_dict.values())
 
     return bonded_dict, total_bonded
 
-async def get_NEPT_circulating_supply():
+async def get_NEPT_circulating_supply(client=None):
+    """
+    Get NEPT circulating supply from the API.
+    Client parameter is optional to maintain compatibility with other function calls.
+    """
     print("Getting nept circulating supply")
     url = "https://api.nept.finance/v1/nept/circulating_supply"
     
@@ -161,17 +199,33 @@ async def get_NEPT_circulating_supply():
         async with session.get(url) as response:
             nept_circulating_supply = await response.text()
     
-    return nept_circulating_supply
+    # Try to convert to float for consistency
+    try:
+        return float(nept_circulating_supply)
+    except ValueError:
+        print(f"Warning: Could not convert circulating supply to float: {nept_circulating_supply}")
+        return 0
 
-async def get_nToken_circulating_supply():
+async def get_nToken_circulating_supply(client=None):
+    """
+    Get nToken circulating supply values.
+    Client parameter is optional to maintain compatibility with other function calls.
+    """
     print("Getting nTokens circulating supply")
     nTokens = ["natom","nusdt","nusdc","ninj","nweth","nausd","nsol","ntia"]
     url = "https://api.nept.finance/v1/supply/"
     nToken_circulating_supply = {}
+    
     for nToken in nTokens:
         async with aiohttp.ClientSession() as session:
             async with session.get(url + nToken) as response:
-                nToken_circulating_supply[nToken] = await response.text()
+                supply_text = await response.text()
+                # Try to convert to float
+                try:
+                    nToken_circulating_supply[nToken] = float(supply_text)
+                except ValueError:
+                    print(f"Warning: Could not convert {nToken} supply to float: {supply_text}")
+                    nToken_circulating_supply[nToken] = 0
                 print(f"nToken: {nToken}, Circulating Supply: {nToken_circulating_supply[nToken]}")
     
     return nToken_circulating_supply
@@ -189,18 +243,13 @@ async def get_lent_amount(client):
 
     for market in lent_amounts:
         denom = market[0]["native_token"]["denom"]
-        # Get decimals from tokens.csv based on denom
-        with open('tokens.csv') as f:
-            tokens = csv.DictReader(f)
-            for token in tokens:
-                if token['denom'] == denom:
-                    decimals = int(token['decimals'])
-                    ticker = token['ticker']    
-                    break
-        amount = float(market[1]["lending_principal"]) / 10**decimals
-
-        print(f"Denom: {denom}, Amount: {amount}, Ticker: {ticker}")
-        lent_amounts_dict[ticker] = amount
+        token_info = _get_token_info(denom)
+        if token_info:
+            decimals = int(token_info['decimals'])
+            ticker = token_info['ticker']
+            amount = float(market[1]["lending_principal"]) / 10**decimals
+            print(f"Denom: {denom}, Amount: {amount}, Ticker: {ticker}")
+            lent_amounts_dict[ticker] = amount
     
     return lent_amounts_dict
 
@@ -218,18 +267,13 @@ async def get_borrowed_amount(client):
 
     for market in borrowed_amounts:
         denom = market[0]["native_token"]["denom"]
-        # Get decimals from tokens.csv based on denom
-        with open('tokens.csv') as f:
-            tokens = csv.DictReader(f)
-            for token in tokens:
-                if token['denom'] == denom:
-                    decimals = int(token['decimals'])
-                    ticker = token['ticker']    
-                    break
-        amount = float(market[1]["debt_pool"]["balance"]) / 10**decimals
-
-        print(f"Denom: {denom}, Amount: {amount}, Ticker: {ticker}")
-        borrowed_amounts_dict[ticker] = amount
+        token_info = _get_token_info(denom)
+        if token_info:
+            decimals = int(token_info['decimals'])
+            ticker = token_info['ticker']
+            amount = float(market[1]["debt_pool"]["balance"]) / 10**decimals
+            print(f"Denom: {denom}, Amount: {amount}, Ticker: {ticker}")
+            borrowed_amounts_dict[ticker] = amount
     
     return borrowed_amounts_dict
 
@@ -238,39 +282,37 @@ async def get_token_prices(client):
     address = "inj1u6cclz0qh5tep9m2qayry9k97dm46pnlqf8nre"
 
     token_prices_dict = {}
-    with open('tokens.csv') as f:
-        tokens = csv.DictReader(f)
-        for token in tokens:
-            denom = token['denom']
-            token_type = token['token_type']
-            ticker = token['ticker'] 
-            if token_type == "native_token":
-                query_data = '{"get_price": {"asset": {"native_token": {"denom": "' + denom + '"}}}}'
-            else:
-                query_data = '{"get_price": {"asset": {"token": {"contract_addr": "' + denom + '"}}}}'
-            contract_state = await client.fetch_smart_contract_state(address=address, query_data=query_data)
-            decoded_data = base64.b64decode(contract_state["data"]).decode("utf-8")
-            token_prices = json.loads(decoded_data)
-            token_price = "$" + str(token_prices["price"])
-            token_prices_dict[ticker] = token_price
+    tokens = _load_tokens()
+    for token in tokens:
+        denom = token['denom']
+        token_type = token['token_type']
+        ticker = token['ticker'] 
+        if token_type == "native_token":
+            query_data = '{"get_price": {"asset": {"native_token": {"denom": "' + denom + '"}}}}'
+        else:
+            query_data = '{"get_price": {"asset": {"token": {"contract_addr": "' + denom + '"}}}}'
+        contract_state = await client.fetch_smart_contract_state(address=address, query_data=query_data)
+        decoded_data = base64.b64decode(contract_state["data"]).decode("utf-8")
+        token_prices = json.loads(decoded_data)
+        token_price = "$" + str(token_prices["price"])
+        token_prices_dict[ticker] = token_price
 
     return token_prices_dict
 
 async def get_nToken_contract_executes(client):
     print("Getting nToken contract executes")
     nToken_contract_executes = {}
-    with open('tokens.csv') as f:
-        tokens = csv.DictReader(f)
-        for token in tokens:
-            contract_executes = None
-            if token['token_type'] == "token":
-                address = token['denom']
-                contract_executes = await client.fetch_wasm_contract_by_address(address=address)
+    tokens = _load_tokens()
+    for token in tokens:
+        contract_executes = None
+        if token['token_type'] == "token":
+            address = token['denom']
+            contract_executes = await client.fetch_wasm_contract_by_address(address=address)
 
-                if contract_executes and isinstance(contract_executes, dict) and "executes" in contract_executes:
-                    nToken_contract_executes[token['ticker']] = contract_executes["executes"]
-                else:
-                    nToken_contract_executes[token['ticker']] = None
+            if contract_executes and isinstance(contract_executes, dict) and "executes" in contract_executes:
+                nToken_contract_executes[token['ticker']] = contract_executes["executes"]
+            else:
+                nToken_contract_executes[token['ticker']] = None
 
     return nToken_contract_executes
 

@@ -4,43 +4,52 @@ from models import (
     ContractData, NTokenContractExecutes, MarketContractExecutes,
     NEPTData, StakingPools
 )
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
 
 def recreate_tables():
-    print("Dropping all tables...")
+    logger.info("Dropping all tables...")
     Base.metadata.drop_all(bind=engine)
     
-    print("Creating tables in order...")
+    logger.info("Creating tables in order...")
     
     # Create parent tables first
-    print("Creating MarketData table...")
+    logger.info("Creating MarketData table...")
     MarketData.__table__.create(bind=engine)
     
-    print("Creating TokenPrices table...")
+    logger.info("Creating TokenPrices table...")
     TokenPrices.__table__.create(bind=engine)
     
-    print("Creating ContractData table...")
+    logger.info("Creating ContractData table...")
     ContractData.__table__.create(bind=engine)
     
-    print("Creating NEPTData table...")
+    logger.info("Creating NEPTData table...")
     NEPTData.__table__.create(bind=engine)
     
     # Create child tables
-    print("Creating TokenRates table...")
+    logger.info("Creating TokenRates table...")
     TokenRates.__table__.create(bind=engine)
     
-    print("Creating TokenAmounts table...")
+    logger.info("Creating TokenAmounts table...")
     TokenAmounts.__table__.create(bind=engine)
     
-    print("Creating NTokenContractExecutes table...")
+    logger.info("Creating NTokenContractExecutes table...")
     NTokenContractExecutes.__table__.create(bind=engine)
     
-    print("Creating MarketContractExecutes table...")
+    logger.info("Creating MarketContractExecutes table...")
     MarketContractExecutes.__table__.create(bind=engine)
     
-    print("Creating StakingPools table...")
+    logger.info("Creating StakingPools table...")
     StakingPools.__table__.create(bind=engine)
     
-    print("Done!")
+    logger.info("Done!")
 
 if __name__ == "__main__":
     recreate_tables() 

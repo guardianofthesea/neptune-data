@@ -29,6 +29,7 @@ logger = logging.getLogger('neptune-data')
 background_loop = None
 background_thread = None
 background_task = None
+collection_thread = None
 
 def run_background_loop():
     global background_loop, background_task
@@ -42,9 +43,23 @@ def run_background_loop():
         raise
 
 def start_background_tasks():
-    global background_thread
+    global background_thread, collection_thread
     try:
-        logger.info("Starting background tasks thread")
+        # Start data collection thread
+        logger.info("Starting background tasks thread for data collection")
+        # Run immediately on startup
+        job()
+        
+        # Schedule to run every 5 minutes
+        schedule.every(5).minutes.do(job)
+        
+        # Start scheduler in a separate thread
+        collection_thread = threading.Thread(target=run_scheduler)
+        collection_thread.daemon = True
+        collection_thread.start()
+        
+        # Start data fetching background thread
+        logger.info("Starting background tasks thread for API data fetch")
         background_thread = threading.Thread(target=run_background_loop)
         background_thread.daemon = True
         background_thread.start()
@@ -152,7 +167,7 @@ async def run_periodically():
             logger.error(f"Error in periodic data fetch: {str(e)}", exc_info=True)
         
         logger.info("Waiting 24 hours until next data fetch")
-        await asyncio.sleep(60)  # 24 hours in seconds
+        await asyncio.sleep(86400)  # 24 hours in seconds = 86400
 
 @app.route('/')
 def index():
@@ -216,7 +231,8 @@ def health():
             'data_available': bool(latest_market_data),
             'background_thread_running': bool(background_thread and background_thread.is_alive()),
             'background_loop_running': bool(background_loop and background_loop.is_running()),
-            'background_task_running': bool(background_task and not background_task.done())
+            'background_task_running': bool(background_task and not background_task.done()),
+            'collection_thread_running': bool(collection_thread and collection_thread.is_alive())
         }
         logger.info(f"Health check status: {status}")
         return jsonify(status)
@@ -230,16 +246,12 @@ async def run_collection():
 def job():
     asyncio.run(run_collection())
 
-def start_background_tasks():
-    # Run immediately on startup
-    job()
-    
-    # Schedule to run every 5 minutes
-    schedule.every(5).minutes.do(job)
-
-@app.route('/')
-def home():
-    return "Neptune Data Collector is running"
+def run_scheduler():
+    """Run the scheduler in a separate thread"""
+    logger.info("Starting scheduler thread")
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
 
 # Start background tasks when the application starts
 start_background_tasks()
@@ -247,8 +259,3 @@ start_background_tasks()
 if __name__ == "__main__":
     # Start the Flask app
     app.run(host='0.0.0.0', port=8080)
-    
-    # Keep the scheduler running
-    while True:
-        schedule.run_pending()
-        time.sleep(1)
