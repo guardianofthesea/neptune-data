@@ -13,7 +13,7 @@ logging.basicConfig(
     format='[%(asctime)s] %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('neptune-data')
 
 async def collect_and_store_data():
     """Collect and store all data types."""

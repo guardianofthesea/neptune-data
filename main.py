@@ -19,9 +19,8 @@ app = Flask(__name__)
 # Configure logging to output to stdout
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S',
-    handlers=[logging.StreamHandler()]
+    format='[%(asctime)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
 )
 logger = logging.getLogger('neptune-data')
 
@@ -117,7 +116,7 @@ def health():
         db.close()
 
 async def run_collection():
-    print(f"Starting data collection at {datetime.utcnow()}")
+    logger.info(f"Starting data collection at {datetime.utcnow()}")
     await collect_and_store_data()
 
 def job():
