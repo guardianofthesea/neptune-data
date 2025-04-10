@@ -210,12 +210,14 @@ async def fetch_data():
             # Store staking pools data
             staking_rates = await get_NEPT_staking_rates(client)
             for pool_number, staking_amount in NEPT_staking_amounts.items():
-                pool_key = f"pool_{pool_number.replace('Pool ', '')}"
+                # Extract just the numeric part from 'staking_pool_1'
+                pool_num = ''.join(filter(str.isdigit, pool_number))
+                pool_key = f"pool_{pool_num}"
                 staking_rate = staking_rates.get(pool_key, "0%").replace('%', '')
                 
                 pool_record = StakingPools(
                     timestamp=current_timestamp,
-                    pool_number=int(pool_number.replace('Pool ', '')),
+                    pool_number=int(pool_num),
                     staking_amount=staking_amount,
                     staking_rate=float(staking_rate)
                 )
