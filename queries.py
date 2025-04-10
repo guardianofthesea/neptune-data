@@ -248,7 +248,7 @@ async def get_lent_amount(client):
             decimals = int(token_info['decimals'])
             ticker = token_info['ticker']
             amount = float(market[1]["lending_principal"]) / 10**decimals
-            print(f"Denom: {denom}, Amount: {amount}, Ticker: {ticker}")
+            #print(f"Denom: {denom}, Amount: {amount}, Ticker: {ticker}")
             lent_amounts_dict[ticker] = amount
     
     return lent_amounts_dict
@@ -272,7 +272,7 @@ async def get_borrowed_amount(client):
             decimals = int(token_info['decimals'])
             ticker = token_info['ticker']
             amount = float(market[1]["debt_pool"]["balance"]) / 10**decimals
-            print(f"Denom: {denom}, Amount: {amount}, Ticker: {ticker}")
+            #print(f"Denom: {denom}, Amount: {amount}, Ticker: {ticker}")
             borrowed_amounts_dict[ticker] = amount
     
     return borrowed_amounts_dict
