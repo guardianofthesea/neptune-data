@@ -154,12 +154,25 @@ async def fetch_data():
         for token_symbol, price in token_prices_data.items():
             # Remove $ symbol
             price_value = price.replace('$', '')
-            price_data = TokenPrices(
-                timestamp=current_timestamp,
-                token_symbol=token_symbol,
-                price=price_value
-            )
-            db.add(price_data)
+            try:
+                price_data = TokenPrices(
+                    timestamp=current_timestamp,
+                    token_symbol=token_symbol,
+                    price=price_value
+                )
+                db.add(price_data)
+            except Exception as e:
+                logger.warning(f"Error adding token price for {token_symbol}: {str(e)}")
+                # If there's an error, try to get the existing record and update it
+                try:
+                    existing_price = db.query(TokenPrices).filter_by(
+                        timestamp=current_timestamp, 
+                        token_symbol=token_symbol
+                    ).first()
+                    if existing_price:
+                        existing_price.price = price_value
+                except Exception as inner_e:
+                    logger.error(f"Error updating token price for {token_symbol}: {str(inner_e)}")
         logger.info(f"Successfully fetched and stored token prices")
 
         # Fetch and store contract data
@@ -246,8 +259,8 @@ async def run_periodically():
         except Exception as e:
             logger.error(f"Error in periodic data fetch: {str(e)}", exc_info=True)
         
-        logger.info("Waiting 24 hours until next data fetch")
-        await asyncio.sleep(86400)  # 24 hours in seconds = 86400
+        logger.info("Waiting 1 minute until next data fetch")
+        await asyncio.sleep(60)  
 
 @app.route('/')
 def index():

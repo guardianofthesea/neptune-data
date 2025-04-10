@@ -47,12 +47,25 @@ async def collect_and_store_data():
             # For each token price, create a separate record
             for token_symbol, price in token_prices_data.items():
                 price_value = price.replace('$', '')  # Remove $ symbol
-                price_data = TokenPrices(
-                    timestamp=current_timestamp,
-                    token_symbol=token_symbol,
-                    price=price_value
-                )
-                db.add(price_data)
+                try:
+                    price_data = TokenPrices(
+                        timestamp=current_timestamp,
+                        token_symbol=token_symbol,
+                        price=price_value
+                    )
+                    db.add(price_data)
+                except Exception as e:
+                    logger.warning(f"Error adding token price for {token_symbol}: {str(e)}")
+                    # If there's an error, try to get the existing record and update it
+                    try:
+                        existing_price = db.query(TokenPrices).filter_by(
+                            timestamp=current_timestamp, 
+                            token_symbol=token_symbol
+                        ).first()
+                        if existing_price:
+                            existing_price.price = price_value
+                    except Exception as inner_e:
+                        logger.error(f"Error updating token price for {token_symbol}: {str(inner_e)}")
             
             logger.info(f"Successfully fetched and stored token prices")
 

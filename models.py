@@ -48,7 +48,7 @@ class TokenAmounts(Base):
 class TokenPrices(Base):
     __tablename__ = "token_prices"
     
-    timestamp = Column(DateTime, primary_key=True, unique=True)
+    timestamp = Column(DateTime, primary_key=True)
     token_symbol = Column(String(10), primary_key=True)
     price = Column(DECIMAL(20,8))
 
