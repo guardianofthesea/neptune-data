@@ -19,8 +19,7 @@ app = Flask(__name__)
 # Configure logging to output to stdout
 logging.basicConfig(
     level=logging.INFO,
-    format='[%(asctime)s] %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S',
+    format='%(message)s',
     handlers=[logging.StreamHandler()]
 )
 

@@ -391,8 +391,6 @@ async def main() -> None:
     network = Network.mainnet()
     client = AsyncClient(network)
     
-    data = await get_NEPT_emission_rate(client)
-    logger.info(data)
 
 
 if __name__ == "__main__":

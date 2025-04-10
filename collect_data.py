@@ -106,8 +106,8 @@ async def collect_and_store_data():
             logger.info(f"Successfully stored NEPT data")
             
             # Store staking pools data
+            staking_rates = await get_NEPT_staking_rates(client)  # Get rates once
             for pool_number, staking_amount in staking_amounts.items():
-                staking_rates = await get_NEPT_staking_rates(client)
                 # Extract just the numeric part from 'staking_pool_1'
                 pool_num = ''.join(filter(str.isdigit, pool_number))
                 pool_key = f"pool_{pool_num}"
