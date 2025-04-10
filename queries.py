@@ -345,7 +345,6 @@ async def get_NEPT_staking_rates(client):
     pool_3_stake = float(staking_data["bonded"][2][1])/10**6
 
     average_yield = emission_rate / sum([pool_1_stake, pool_2_stake, pool_3_stake]) *100
-    logger.info(f"Average yield: {average_yield}")
 
     # Calculate effective stakes
     eff_stake_1 = pool_1_stake * pool_1_reward_weight

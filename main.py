@@ -13,8 +13,12 @@ import time
 from collect_data import collect_and_store_data
 import schedule
 from database import get_db
+import os
 
 app = Flask(__name__)
+
+# Get schedule interval from environment variable, default to 30 minutes
+SCHEDULE_INTERVAL = int(os.getenv('SCHEDULE_INTERVAL_MINUTES', '30'))
 
 # Configure logging to output to stdout
 logging.basicConfig(
@@ -29,6 +33,11 @@ logger = logging.getLogger('neptune-data')
 # Ensure the logger has the correct level
 logger.setLevel(logging.INFO)
 
+# Add a custom formatter to the logger
+formatter = logging.Formatter('%(message)s')
+for handler in logger.handlers:
+    handler.setFormatter(formatter)
+
 # Global variables for health check
 collection_thread = None
 
@@ -40,8 +49,9 @@ def start_background_tasks():
         # Run immediately on startup
         job()
         
-        # Schedule to run every 2 minutes
-        schedule.every(1).minutes.do(job)
+        # Schedule to run based on environment variable
+        schedule.every(SCHEDULE_INTERVAL).minutes.do(job)
+        logger.info(f"Scheduled data collection to run every {SCHEDULE_INTERVAL} minutes")
         
         # Start scheduler in a separate thread
         collection_thread = threading.Thread(target=run_scheduler)
