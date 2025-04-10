@@ -13,12 +13,7 @@ import csv
 import os
 import logging
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='[%(asctime)s] %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
+# Get the logger
 logger = logging.getLogger('neptune-data')
 
 # Cache for CSV data to avoid repeated file access

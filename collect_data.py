@@ -7,12 +7,7 @@ from queries import get_market_contract_executes, get_all_borrow_accounts, get_N
 from models import MarketData, TokenPrices, ContractData, NEPTData, TokenRates, TokenAmounts, NTokenContractExecutes, MarketContractExecutes, StakingPools
 from database import get_db
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='[%(asctime)s] %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
+# Get the logger
 logger = logging.getLogger('neptune-data')
 
 async def collect_and_store_data():

@@ -6,12 +6,7 @@ from models import (
 )
 import logging
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='[%(asctime)s] %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
+# Get the logger
 logger = logging.getLogger('neptune-data')
 
 def recreate_tables():

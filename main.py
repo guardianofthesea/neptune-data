@@ -23,7 +23,12 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S',
     handlers=[logging.StreamHandler()]
 )
+
+# Get the logger
 logger = logging.getLogger('neptune-data')
+
+# Ensure the logger has the correct level
+logger.setLevel(logging.INFO)
 
 # Global variables for health check
 collection_thread = None
