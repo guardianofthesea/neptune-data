@@ -4,8 +4,16 @@ from datetime import datetime, timedelta
 from flask import Flask, jsonify
 from pyinjective.async_client import AsyncClient
 from pyinjective.core.network import Network
-from queries import get_market_contract_executes, get_all_borrow_accounts, get_NEPT_emission_rate, get_borrow_rates, get_lending_rates, get_NEPT_staking_amounts, get_NEPT_circulating_supply, get_nToken_circulating_supply, get_lent_amount, get_borrowed_amount, get_token_prices, get_nToken_contract_executes, get_NEPT_staking_rates
-from models import MarketData, TokenPrices, ContractData, NEPTData, SessionLocal
+from queries import (
+    get_market_contract_executes, get_all_borrow_accounts, get_NEPT_emission_rate, 
+    get_borrow_rates, get_lending_rates, get_NEPT_staking_amounts, get_NEPT_circulating_supply, 
+    get_nToken_circulating_supply, get_lent_amount, get_borrowed_amount, get_token_prices, 
+    get_nToken_contract_executes, get_NEPT_staking_rates
+)
+from models import (
+    MarketData, TokenPrices, ContractData, NEPTData, SessionLocal, 
+    TokenAmounts, TokenRates, NTokenContractExecutes, MarketContractExecutes, StakingPools
+)
 from sqlalchemy import desc
 import threading
 import os
@@ -84,68 +92,138 @@ async def fetch_data():
     logger.info("Fetching market data...")
     
     try:
+        # Create timestamp for consistency across records
+        current_timestamp = datetime.utcnow()
+        
         # Fetch market data
         borrow_accounts_data = await get_all_borrow_accounts(client)
         logger.info(f"Successfully fetched borrow accounts data: {borrow_accounts_data}")
         
-        lent_amount = await get_lent_amount(client)
-        borrowed_amount = await get_borrowed_amount(client)
-        logger.info(f"Successfully fetched lending/borrowing amounts: {lent_amount}, {borrowed_amount}")
-        
-        borrow_rates = await get_borrow_rates(client)
-        lending_rates = await get_lending_rates(client)
-        logger.info(f"Successfully fetched interest rates")
-        
-        nToken_circulating_supply = await get_nToken_circulating_supply()
-        logger.info(f"Successfully fetched nToken supply: {nToken_circulating_supply}")
-        
         # Store market data
         market_data = MarketData(
+            timestamp=current_timestamp,
             borrow_accounts_count=borrow_accounts_data['total_accounts_count'],
-            unique_borrow_addresses=borrow_accounts_data['unique_addresses_count'],
-            lent_amount=lent_amount,
-            borrowed_amount=borrowed_amount,
-            borrow_rates=borrow_rates,
-            lending_rates=lending_rates,
-            ntoken_circulating_supply=nToken_circulating_supply
+            unique_borrow_addresses=borrow_accounts_data['unique_addresses_count']
         )
         db.add(market_data)
         logger.info("Added market data to database")
 
+        # Fetch and store token amounts
+        logger.info("Fetching lending/borrowing amounts...")
+        lent_amounts = await get_lent_amount(client)
+        borrowed_amounts = await get_borrowed_amount(client)
+        logger.info(f"Successfully fetched lending/borrowing amounts")
+        
+        for token_symbol in set(list(lent_amounts.keys()) + list(borrowed_amounts.keys())):
+            lent_amount_value = lent_amounts.get(token_symbol, 0)
+            borrowed_amount_value = borrowed_amounts.get(token_symbol, 0)
+            
+            token_amount = TokenAmounts(
+                timestamp=current_timestamp,
+                token_symbol=token_symbol,
+                lent_amount=lent_amount_value,
+                borrowed_amount=borrowed_amount_value
+            )
+            db.add(token_amount)
+        
+        # Fetch and store token rates 
+        logger.info("Fetching interest rates...")
+        borrow_rates_data = await get_borrow_rates(client)
+        lending_rates_data = await get_lending_rates(client)
+        logger.info(f"Successfully fetched interest rates")
+        
+        for token_symbol, borrow_rate in borrow_rates_data.items():
+            lend_rate = lending_rates_data.get(token_symbol, "0%")
+            
+            # Remove % symbol and convert to float
+            borrow_rate_value = float(borrow_rate.replace('%', ''))
+            lend_rate_value = float(lend_rate.replace('%', ''))
+            
+            token_rate = TokenRates(
+                timestamp=current_timestamp,
+                token_symbol=token_symbol,
+                borrow_rate=borrow_rate_value,
+                lend_rate=lend_rate_value
+            )
+            db.add(token_rate)
+
         # Fetch and store price data
         logger.info("Fetching price data...")
-        token_prices = await get_token_prices(client)
-        price_data = TokenPrices(token_prices=token_prices)
-        db.add(price_data)
-        logger.info(f"Successfully fetched and stored token prices: {token_prices}")
+        token_prices_data = await get_token_prices(client)
+        
+        for token_symbol, price in token_prices_data.items():
+            # Remove $ symbol
+            price_value = price.replace('$', '')
+            price_data = TokenPrices(
+                timestamp=current_timestamp,
+                token_symbol=token_symbol,
+                price=price_value
+            )
+            db.add(price_data)
+        logger.info(f"Successfully fetched and stored token prices")
 
         # Fetch and store contract data
         logger.info("Fetching contract data...")
-        nToken_contract_executes = await get_nToken_contract_executes(client)
-        executes = await get_market_contract_executes(client)
-        contract_data = ContractData(
-            ntoken_contract_executes=nToken_contract_executes,
-            market_contract_executes=executes
+        contract_data_record = ContractData(
+            timestamp=current_timestamp
         )
-        db.add(contract_data)
+        db.add(contract_data_record)
+        logger.info("Successfully created contract data record")
+        
+        # Fetch and store nToken contract executes
+        ntoken_executes_data = await get_nToken_contract_executes(client)
+        for token_symbol, execute_count in ntoken_executes_data.items():
+            if execute_count is not None:
+                ntoken_record = NTokenContractExecutes(
+                    timestamp=current_timestamp,
+                    token_symbol=token_symbol,
+                    execute_count=execute_count
+                )
+                db.add(ntoken_record)
+        
+        # Fetch and store market contract executes
+        market_executes = await get_market_contract_executes(client)
+        if market_executes:
+            market_executes_record = MarketContractExecutes(
+                timestamp=current_timestamp,
+                contract_type="market",
+                execute_count=market_executes
+            )
+            db.add(market_executes_record)
         logger.info("Successfully fetched and stored contract data")
 
         # Fetch and store NEPT data
         logger.info("Fetching NEPT data...")
-        NEPT_circulating_supply = await get_NEPT_circulating_supply()
-        NEPT_emission_rate = await get_NEPT_emission_rate(client)
-        NEPT_staking_amounts, NEPT_total_bonded = await get_NEPT_staking_amounts(client)
-        NEPT_staking_rates = await get_NEPT_staking_rates(client)
-        
-        nept_data = NEPTData(
-            circulating_supply=NEPT_circulating_supply,
-            emission_rate=NEPT_emission_rate,
-            staking_amounts=NEPT_staking_amounts,
-            total_bonded=NEPT_total_bonded,
-            staking_rates=NEPT_staking_rates
-        )
-        db.add(nept_data)
-        logger.info(f"Successfully fetched and stored NEPT data: supply={NEPT_circulating_supply}, bonded={NEPT_total_bonded}")
+        try:
+            NEPT_circulating_supply = await get_NEPT_circulating_supply()
+            NEPT_emission_rate = await get_NEPT_emission_rate(client)
+            NEPT_staking_amounts, NEPT_total_bonded = await get_NEPT_staking_amounts(client)
+            
+            nept_data = NEPTData(
+                timestamp=current_timestamp,
+                circulating_supply=NEPT_circulating_supply,
+                emission_rate=NEPT_emission_rate,
+                total_bonded=NEPT_total_bonded
+            )
+            db.add(nept_data)
+            
+            # Store staking pools data
+            staking_rates = await get_NEPT_staking_rates(client)
+            for pool_number, staking_amount in NEPT_staking_amounts.items():
+                pool_key = f"pool_{pool_number.replace('Pool ', '')}"
+                staking_rate = staking_rates.get(pool_key, "0%").replace('%', '')
+                
+                pool_record = StakingPools(
+                    timestamp=current_timestamp,
+                    pool_number=int(pool_number.replace('Pool ', '')),
+                    staking_amount=staking_amount,
+                    staking_rate=float(staking_rate)
+                )
+                db.add(pool_record)
+                
+            logger.info(f"Successfully fetched and stored NEPT data: supply={NEPT_circulating_supply}, bonded={NEPT_total_bonded}")
+        except Exception as e:
+            logger.error(f"Error processing NEPT data: {str(e)}")
         
         # Commit all changes
         db.commit()
