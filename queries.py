@@ -386,7 +386,7 @@ async def get_NEPT_emission_rate(client):
     emission_rate = float(pool_data["emission_rate"])/10**6
     return emission_rate
 
-async def collateral_amounts(client):
+async def get_collateral_amounts(client):
     logger.info("Getting collateral amounts")
     address = "inj1nc7gjkf2mhp34a6gquhurg8qahnw5kxs5u3s4u"
     query_data = '{"get_all_collaterals": {}}'
