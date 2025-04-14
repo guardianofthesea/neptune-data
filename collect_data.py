@@ -200,7 +200,17 @@ async def collect_and_store_data():
             lp_pool_data = await get_LP_info(client)
             
             if lp_pool_data:
+                # Use a dictionary to store unique pools by pool_address
+                unique_pools = {}
                 for pool in lp_pool_data:
+                    pool_address = pool["pool_address"]
+                    if pool_address not in unique_pools:
+                        unique_pools[pool_address] = pool
+                    else:
+                        logger.warning(f"Duplicate pool address found: {pool_address}. Using first occurrence.")
+                
+                # Store only unique pools
+                for pool in unique_pools.values():
                     lp_pool_record = LPPoolData(
                         timestamp=current_timestamp,
                         pool_address=pool["pool_address"],
@@ -214,7 +224,7 @@ async def collect_and_store_data():
                         yield_total=pool["yield_total"]
                     )
                     db.add(lp_pool_record)
-                logger.info(f"Successfully stored LP pool data for {len(lp_pool_data)} pools")
+                logger.info(f"Successfully stored LP pool data for {len(unique_pools)} unique pools")
             else:
                 logger.warning("No LP pool data was fetched")
 
