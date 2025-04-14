@@ -470,7 +470,7 @@ async def get_LP_info(client):
                             # Get liquidity and volume data
                             total_liquidity_usd = float(pool_info.get("totalLiquidityUSD", 0))
                             day_volume_usd = float(pool_info.get("dayVolumeUSD", 0))
-                            day_LP_fees_usd = float(pool_info.get("dayLPFeesUSD", 0))
+                            day_LP_fees_usd = float(pool_info.get("dayLpFeesUSD", 0))
                             
                             # Get yield data
                             yield_data = pool_info.get("yield", {})
