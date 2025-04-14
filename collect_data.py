@@ -3,8 +3,8 @@ import logging
 from datetime import datetime
 from pyinjective.async_client import AsyncClient
 from pyinjective.core.network import Network
-from queries import get_market_contract_executes, get_all_borrow_accounts, get_NEPT_emission_rate, get_borrow_rates, get_lending_rates, get_NEPT_staking_amounts, get_NEPT_circulating_supply, get_nToken_circulating_supply, get_lent_amount, get_borrowed_amount, get_token_prices, get_nToken_contract_executes, get_NEPT_staking_rates, get_collateral_amounts
-from models import MarketData, TokenPrices, ContractData, NEPTData, TokenRates, TokenAmounts, NTokenContractExecutes, MarketContractExecutes, StakingPools, CollateralAmounts
+from queries import get_market_contract_executes, get_all_borrow_accounts, get_NEPT_emission_rate, get_borrow_rates, get_lending_rates, get_NEPT_staking_amounts, get_NEPT_circulating_supply, get_nToken_circulating_supply, get_lent_amount, get_borrowed_amount, get_token_prices, get_nToken_contract_executes, get_NEPT_staking_rates, get_collateral_amounts, get_LP_info
+from models import MarketData, TokenPrices, ContractData, NEPTData, TokenRates, TokenAmounts, NTokenContractExecutes, MarketContractExecutes, StakingPools, CollateralAmounts, LPPoolData
 from database import get_db
 
 # Get the logger
@@ -194,6 +194,29 @@ async def collect_and_store_data():
                 db.add(collateral_record)
             
             logger.info(f"Successfully stored collateral amounts")
+
+            # Collect and store LP pool data
+            logger.info("Fetching LP pool data...")
+            lp_pool_data = await get_LP_info(client)
+            
+            if lp_pool_data:
+                for pool in lp_pool_data:
+                    lp_pool_record = LPPoolData(
+                        timestamp=current_timestamp,
+                        pool_address=pool["pool_address"],
+                        LP_symbol=pool["LP_symbol"],
+                        total_liquidity_usd=pool["total_liquidity_usd"],
+                        day_volume_usd=pool["day_volume_usd"],
+                        day_LP_fees_usd=pool["day_LP_fees_usd"],
+                        yield_pool_fees=pool["yield_pool_fees"],
+                        yield_astro_rewards=pool["yield_astro_rewards"],
+                        yield_external_rewards=pool["yield_external_rewards"],
+                        yield_total=pool["yield_total"]
+                    )
+                    db.add(lp_pool_record)
+                logger.info(f"Successfully stored LP pool data for {len(lp_pool_data)} pools")
+            else:
+                logger.warning("No LP pool data was fetched")
 
             # Commit all changes
             db.commit()

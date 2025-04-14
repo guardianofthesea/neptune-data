@@ -112,4 +112,22 @@ class CollateralAmounts(Base):
     
     __table_args__ = (
         UniqueConstraint('timestamp', 'token_symbol', name='uix_collateral_amounts'),
+    )
+
+class LPPoolData(Base):
+    __tablename__ = "lp_pool_data"
+    
+    timestamp = Column(DateTime, primary_key=True, default=datetime.utcnow)
+    pool_address = Column(String(100), primary_key=True)
+    LP_symbol = Column(String(50))
+    total_liquidity_usd = Column(DECIMAL(20,8))
+    day_volume_usd = Column(DECIMAL(20,8))
+    day_LP_fees_usd = Column(DECIMAL(20,8))
+    yield_pool_fees = Column(DECIMAL(10,4))
+    yield_astro_rewards = Column(DECIMAL(10,4))
+    yield_external_rewards = Column(DECIMAL(10,4))
+    yield_total = Column(DECIMAL(10,4))
+    
+    __table_args__ = (
+        UniqueConstraint('timestamp', 'pool_address', name='uix_lp_pool_data'),
     ) 

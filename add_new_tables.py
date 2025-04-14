@@ -1,5 +1,5 @@
 from database import Base, engine
-from models import CollateralAmounts
+from models import LPPoolData
 import logging
 
 # Get the logger

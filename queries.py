@@ -408,11 +408,120 @@ async def get_collateral_amounts(client):
             collaterals_dict[ticker] = amount
     return collaterals_dict
 
+def _load_LP_pools():
+    """Load LP pools from CSV file"""
+    pools = []
+    try:
+        with open('LP_pools.csv') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                pools.append(row)
+    except Exception as e:
+        logger.error(f"Error loading LP pools: {e}")
+    return pools
+
+async def get_LP_info(client):
+    logger.info("Getting LP info for all pools")
+    url = "https://api.astroport.fi/api/pools/"
+    pools_data = []
+    
+    # Load pool addresses from CSV
+    pools = _load_LP_pools()
+    if not pools:
+        logger.error("No LP pools found in CSV file")
+        return None
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            for pool in pools:
+                pool_address = pool.get('LP_pool_address')
+                if not pool_address:
+                    logger.warning(f"Skipping pool with missing address: {pool}")
+                    continue
+                    
+                try:
+                    async with session.get(url + pool_address) as response:
+                        if response.status != 200:
+                            logger.error(f"Failed to fetch LP info for pool {pool_address}. Status: {response.status}")
+                            continue
+                            
+                        pool_info = await response.json()
+                        
+                        if not pool_info:
+                            logger.error(f"Empty response from API for pool {pool_address}")
+                            continue
+                        
+                        try:
+                            # Get token symbols from the assets array
+                            assets = pool_info.get("assets", [])
+                            if not assets or len(assets) < 2:
+                                logger.error(f"Invalid assets data for pool {pool_address}: {assets}")
+                                continue
+                                
+                            token1 = assets[0].get("symbol", "Unknown")
+                            token2 = assets[1].get("symbol", "Unknown")
+                            
+                            # Strip '.peggy' from token symbols if present
+                            token1 = token1.replace('.peggy', '')
+                            token2 = token2.replace('.peggy', '')
+                            
+                            LP_symbol = token1 + "/" + token2
+                            
+                            # Get liquidity and volume data
+                            total_liquidity_usd = float(pool_info.get("totalLiquidityUSD", 0))
+                            day_volume_usd = float(pool_info.get("dayVolumeUSD", 0))
+                            day_LP_fees_usd = float(pool_info.get("dayLPFeesUSD", 0))
+                            
+                            # Get yield data
+                            yield_data = pool_info.get("yield", {})
+                            yield_total = float(yield_data.get("total", 0))*100
+                            yield_pool_fees = float(yield_data.get("poolFees", 0))*100
+                            yield_astro_rewards = float(yield_data.get("astro", 0))*100
+                            yield_external_rewards = float(yield_data.get("externalRewards", 0))*100
+                            
+                            # Print the extracted information
+                            print(f"\nPool: {LP_symbol}")
+                            print(f"Total Liquidity (USD): ${total_liquidity_usd:,.2f}")
+                            print(f"24h Volume (USD): ${day_volume_usd:,.2f}")
+                            print(f"24h LP Fees (USD): ${day_LP_fees_usd:,.2f}")
+                            print(f"Total Yield: {yield_total}%")
+                            print(f"Pool Fees: {yield_pool_fees}%")
+                            print(f"Astro Rewards: {yield_astro_rewards}%")
+                            print(f"External Rewards: {yield_external_rewards}%")
+                            
+
+                            pools_data.append({
+                                "LP_symbol": LP_symbol,
+                                "pool_address": pool_address,
+                                "total_liquidity_usd": total_liquidity_usd,
+                                "day_volume_usd": day_volume_usd,
+                                "day_LP_fees_usd": day_LP_fees_usd,
+                                "yield_pool_fees": yield_pool_fees,
+                                "yield_astro_rewards": yield_astro_rewards,
+                                "yield_external_rewards": yield_external_rewards,
+                                "yield_total": yield_total
+                            })
+                            
+                        except (IndexError, KeyError, ValueError) as e:
+                            logger.error(f"Error parsing pool info for {pool_address}: {str(e)}")
+                            logger.error(f"Pool info structure: {json.dumps(pool_info, indent=2)}")
+                            continue
+                            
+                except Exception as e:
+                    logger.error(f"Error fetching LP info for pool {pool_address}: {str(e)}")
+                    continue
+                    
+    except Exception as e:
+        logger.error(f"Error in get_LP_info: {str(e)}")
+        return None
+        
+    return pools_data
 
 async def main() -> None:
     network = Network.mainnet()
     client = AsyncClient(network)
-    
+    lp_info = await get_LP_info(client)
+    print(lp_info)
 
 if __name__ == "__main__":
     asyncio.run(main())
