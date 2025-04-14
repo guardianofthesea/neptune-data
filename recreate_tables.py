@@ -2,7 +2,7 @@ from database import Base, engine
 from models import (
     MarketData, TokenRates, TokenAmounts, TokenPrices,
     ContractData, NTokenContractExecutes, MarketContractExecutes,
-    NEPTData, StakingPools
+    NEPTData, StakingPools, CollateralAmounts
 )
 import logging
 
@@ -43,6 +43,9 @@ def recreate_tables():
     
     logger.info("Creating StakingPools table...")
     StakingPools.__table__.create(bind=engine)
+    
+    logger.info("Creating CollateralAmounts table...")
+    CollateralAmounts.__table__.create(bind=engine)
     
     logger.info("Done!")
 
