@@ -46,12 +46,37 @@ def start_background_tasks():
     try:
         # Start data collection thread
         logger.info("Starting background tasks thread for data collection")
-        # Run immediately on startup
-        job()
         
-        # Schedule to run based on environment variable
-        schedule.every(SCHEDULE_INTERVAL).minutes.do(job)
-        logger.info(f"Scheduled data collection to run every {SCHEDULE_INTERVAL} minutes")
+        # Get the last entry time from the database
+        db = SessionLocal()
+        try:
+            latest_market_data = db.query(MarketData).order_by(desc(MarketData.timestamp)).first()
+            if latest_market_data:
+                # Calculate time until next scheduled run
+                last_run = latest_market_data.timestamp
+                next_run = last_run + timedelta(minutes=SCHEDULE_INTERVAL)
+                now = datetime.utcnow()
+                
+                if next_run > now:
+                    # Schedule for the calculated next run time
+                    delay = (next_run - now).total_seconds()
+                    logger.info(f"Last data collection was at {last_run}, scheduling next run in {delay/60:.1f} minutes")
+                    schedule.every(delay).seconds.do(job)
+                else:
+                    # Run immediately if we're past the scheduled time
+                    logger.info("Last data collection is older than schedule interval, running immediately")
+                    job()
+            else:
+                # No previous data, run immediately
+                logger.info("No previous data found, running immediately")
+                job()
+            
+            # Schedule subsequent runs
+            schedule.every(SCHEDULE_INTERVAL).minutes.do(job)
+            logger.info(f"Scheduled data collection to run every {SCHEDULE_INTERVAL} minutes")
+            
+        finally:
+            db.close()
         
         # Start scheduler in a separate thread
         collection_thread = threading.Thread(target=run_scheduler)

@@ -101,4 +101,15 @@ class StakingPools(Base):
     staking_rate = Column(DECIMAL(10,4))
     
     # Relationship
-    nept_data = relationship("NEPTData", back_populates="staking_pools") 
+    nept_data = relationship("NEPTData", back_populates="staking_pools")
+
+class CollateralAmounts(Base):
+    __tablename__ = "collateral_amounts"
+    
+    timestamp = Column(DateTime, primary_key=True, default=datetime.utcnow)
+    token_symbol = Column(String(10), primary_key=True)
+    amount = Column(DECIMAL(20,8))
+    
+    __table_args__ = (
+        UniqueConstraint('timestamp', 'token_symbol', name='uix_collateral_amounts'),
+    ) 

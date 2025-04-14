@@ -3,8 +3,8 @@ import logging
 from datetime import datetime
 from pyinjective.async_client import AsyncClient
 from pyinjective.core.network import Network
-from queries import get_market_contract_executes, get_all_borrow_accounts, get_NEPT_emission_rate, get_borrow_rates, get_lending_rates, get_NEPT_staking_amounts, get_NEPT_circulating_supply, get_nToken_circulating_supply, get_lent_amount, get_borrowed_amount, get_token_prices, get_nToken_contract_executes, get_NEPT_staking_rates
-from models import MarketData, TokenPrices, ContractData, NEPTData, TokenRates, TokenAmounts, NTokenContractExecutes, MarketContractExecutes, StakingPools
+from queries import get_market_contract_executes, get_all_borrow_accounts, get_NEPT_emission_rate, get_borrow_rates, get_lending_rates, get_NEPT_staking_amounts, get_NEPT_circulating_supply, get_nToken_circulating_supply, get_lent_amount, get_borrowed_amount, get_token_prices, get_nToken_contract_executes, get_NEPT_staking_rates, get_collateral_amounts
+from models import MarketData, TokenPrices, ContractData, NEPTData, TokenRates, TokenAmounts, NTokenContractExecutes, MarketContractExecutes, StakingPools, CollateralAmounts
 from database import get_db
 
 # Get the logger
@@ -179,6 +179,21 @@ async def collect_and_store_data():
                     db.add(ntoken_record)
             
             logger.info(f"Successfully stored nToken contract executes")
+
+            # Collect and store collateral amounts
+            logger.info("Fetching collateral amounts...")
+            collateral_amounts_data = await get_collateral_amounts(client)
+            
+            # For each token, create a collateral amount record
+            for token_symbol, amount in collateral_amounts_data.items():
+                collateral_record = CollateralAmounts(
+                    timestamp=current_timestamp,
+                    token_symbol=token_symbol,
+                    amount=amount
+                )
+                db.add(collateral_record)
+            
+            logger.info(f"Successfully stored collateral amounts")
 
             # Commit all changes
             db.commit()

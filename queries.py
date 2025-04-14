@@ -386,11 +386,33 @@ async def get_NEPT_emission_rate(client):
     emission_rate = float(pool_data["emission_rate"])/10**6
     return emission_rate
 
+async def collateral_amounts(client):
+    logger.info("Getting collateral amounts")
+    address = "inj1nc7gjkf2mhp34a6gquhurg8qahnw5kxs5u3s4u"
+    query_data = '{"get_all_collaterals": {}}'
+    contract_state = await client.fetch_smart_contract_state(address=address, query_data=query_data)
+    decoded_data = base64.b64decode(contract_state["data"]).decode("utf-8")
+    collaterals = json.loads(decoded_data)
+
+    collaterals_dict = {}
+    for collateral in collaterals:
+        if "native_token" in collateral[0]:
+            denom = collateral[0]["native_token"]["denom"]
+        else:
+            denom = collateral[0]["token"]["contract_addr"]
+        token_info = _get_token_info(denom)
+        if token_info:
+            ticker = token_info['ticker']
+            decimals = int(token_info['decimals'])
+            amount = float(collateral[1]["collateral_pool"]["balance"]) / 10**decimals
+            collaterals_dict[ticker] = amount
+    return collaterals_dict
+
+
 async def main() -> None:
     network = Network.mainnet()
     client = AsyncClient(network)
     
-
 
 if __name__ == "__main__":
     asyncio.run(main())
